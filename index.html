@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="미팅리포터">
+<meta name="theme-color" content="#E24B4A">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>미팅 AI 리포터</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif; background: #f5f5f7; color: #1d1d1f; overscroll-behavior: none; }
+.header { background: #fff; border-bottom: 0.5px solid rgba(0,0,0,0.12); padding: 16px 20px 12px; position: sticky; top: 0; z-index: 10; display: flex; align-items: center; justify-content: space-between; }
+.header-title { font-size: 17px; font-weight: 600; }
+.header-sub { font-size: 12px; color: #888; margin-top: 2px; }
+.settings-btn { width: 32px; height: 32px; border-radius: 50%; background: #f0f0f0; border: none; cursor: pointer; font-size: 16px; }
+.scroll-area { padding: 16px 16px 40px; }
+.card { background: #fff; border-radius: 16px; padding: 20px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+.card-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: #888; margin-bottom: 14px; }
+.seg-control { display: flex; background: #f0f0f0; border-radius: 10px; padding: 3px; }
+.seg-btn { flex: 1; padding: 7px 4px; border: none; background: transparent; font-size: 13px; border-radius: 8px; cursor: pointer; color: #555; font-weight: 400; }
+.seg-btn.active { background: #fff; color: #1d1d1f; font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
+.recorder-center { text-align: center; padding: 10px 0; }
+.record-btn { width: 88px; height: 88px; border-radius: 50%; border: none; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; cursor: pointer; transition: transform 0.1s; }
+.record-btn:active { transform: scale(0.94); }
+.record-btn.idle { background: #E24B4A; }
+.record-btn.recording { background: #E24B4A; animation: pulse 1.2s infinite; }
+.record-btn.processing { background: #e0e0e0; }
+@keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(226,75,74,0.4); } 50% { box-shadow: 0 0 0 14px rgba(226,75,74,0); } }
+.timer { font-size: 32px; font-weight: 300; font-variant-numeric: tabular-nums; letter-spacing: 2px; margin-bottom: 6px; }
+.rec-status { font-size: 14px; color: #888; min-height: 22px; }
+.live-transcript { background: #f5f5f7; border-radius: 10px; padding: 12px; margin-top: 14px; font-size: 13px; line-height: 1.6; color: #555; min-height: 60px; max-height: 120px; overflow-y: auto; text-align: left; display: none; }
+.btn-primary { width: 100%; padding: 14px; background: #E24B4A; color: #fff; border: none; border-radius: 12px; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 14px; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.btn-primary:active { opacity: 0.85; }
+.btn-primary:disabled { background: #ccc; }
+.btn-secondary { width: 100%; padding: 13px; background: #f0f0f0; color: #1d1d1f; border: none; border-radius: 12px; font-size: 15px; font-weight: 500; cursor: pointer; margin-top: 8px; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.btn-secondary:active { background: #e0e0e0; }
+.transcript-full { background: #f5f5f7; border-radius: 10px; padding: 14px; font-size: 13px; line-height: 1.8; color: #333; white-space: pre-wrap; max-height: 200px; overflow-y: auto; margin-bottom: 12px; }
+.report-text { font-size: 14px; line-height: 1.75; color: #1d1d1f; white-space: pre-wrap; word-break: keep-all; }
+.btn-row { display: flex; gap: 8px; margin-top: 14px; }
+.btn-half { flex: 1; padding: 11px 8px; background: #f0f0f0; color: #1d1d1f; border: none; border-radius: 10px; font-size: 14px; font-weight: 500; cursor: pointer; }
+.btn-half:active { background: #e0e0e0; }
+.field-label { font-size: 13px; color: #555; margin-bottom: 6px; margin-top: 12px; }
+.field-label:first-child { margin-top: 0; }
+.text-input { width: 100%; padding: 12px 14px; background: #f5f5f7; border: 1px solid transparent; border-radius: 10px; font-size: 15px; color: #1d1d1f; outline: none; -webkit-appearance: none; }
+.text-input:focus { border-color: #E24B4A; background: #fff; }
+.email-saved-badge { font-size: 11px; color: #34C759; margin-left: 6px; }
+.btn-send { width: 100%; padding: 14px; background: #007AFF; color: #fff; border: none; border-radius: 12px; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 14px; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.btn-send:active { opacity: 0.85; }
+.btn-send:disabled { background: #ccc; }
+.audio-badge { display: inline-flex; align-items: center; gap: 6px; background: #e8f5e9; color: #2e7d32; font-size: 12px; padding: 6px 10px; border-radius: 8px; margin-bottom: 10px; }
+.toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.78); color: #fff; padding: 10px 20px; border-radius: 20px; font-size: 14px; white-space: nowrap; opacity: 0; transition: opacity 0.2s; pointer-events: none; z-index: 100; }
+.toast.show { opacity: 1; }
+.overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: flex-end; z-index: 50; }
+.modal { background: #fff; border-radius: 20px 20px 0 0; padding: 24px 20px 40px; width: 100%; }
+.modal h2 { font-size: 18px; font-weight: 600; margin-bottom: 6px; }
+.modal p { font-size: 14px; color: #555; line-height: 1.6; margin-bottom: 16px; }
+.modal-link { color: #007AFF; text-decoration: none; }
+.spinner { width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.4); border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; display: inline-block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.error-msg { font-size: 13px; color: #E24B4A; margin-top: 8px; text-align: center; }
+.hidden { display: none !important; }
+.chat-msg { margin-bottom: 10px; }
+.chat-msg-user {
+  display: flex; justify-content: flex-end;
+}
+.chat-msg-user .bubble {
+  background: #E24B4A; color: white;
+  padding: 10px 14px; border-radius: 16px 16px 4px 16px;
+  font-size: 14px; line-height: 1.5; max-width: 85%;
+  white-space: pre-wrap; word-break: keep-all;
+}
+.chat-msg-ai .bubble {
+  background: #f0f0f0; color: #1d1d1f;
+  padding: 10px 14px; border-radius: 16px 16px 16px 4px;
+  font-size: 14px; line-height: 1.5; max-width: 92%;
+  white-space: pre-wrap; word-break: keep-all;
+}
+.chat-typing {
+  display: flex; gap: 4px; padding: 12px 14px;
+  background: #f0f0f0; border-radius: 16px 16px 16px 4px;
+  width: fit-content;
+}
+.chat-typing span {
+  width: 7px; height: 7px; background: #aaa;
+  border-radius: 50%; animation: typing 1s infinite;
+}
+.chat-typing span:nth-child(2) { animation-delay: 0.15s; }
+.chat-typing span:nth-child(3) { animation-delay: 0.3s; }
+@keyframes typing { 0%,60%,100% { transform: translateY(0); } 30% { transform: translateY(-5px); } }
+.quick-btn {
+  padding: 6px 12px; background: #f0f0f0; border: none;
+  border-radius: 20px; font-size: 12px; color: #555;
+  cursor: pointer; white-space: nowrap;
+}
+.quick-btn:active { background: #e0e0e0; }
+.attach-btn {
+  flex: 1; padding: 12px 8px;
+  background: #f5f5f7; color: #555; border: 1.5px solid #e0e0e0;
+  border-radius: 12px; font-size: 14px; font-weight: 500;
+  cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;
+  transition: all 0.15s;
+}
+.attach-btn.selected {
+  background: #e8f4ff; color: #007AFF;
+  border-color: #007AFF; font-weight: 600;
+}
+.attach-check { font-size: 16px; }
+.divider { display: flex; align-items: center; gap: 10px; margin: 4px 0 12px; }
+.divider-line { flex: 1; height: 0.5px; background: #e0e0e0; }
+.divider-text { font-size: 11px; color: #aaa; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="header-title">🎙 미팅 AI 리포터</div>
+    <div class="header-sub">영어 음성인식 → 한국어 보고서</div>
+  </div>
+  <button class="settings-btn" onclick="openSettings()">⚙️</button>
+</div>
+
+<div class="scroll-area" id="scrollArea">
+
+  <div class="card">
+    <div class="card-label">보고서 언어</div>
+    <div class="seg-control">
+      <button class="seg-btn active" onclick="setMode('ko',this)">한국어</button>
+      <button class="seg-btn" onclick="setMode('en',this)">English</button>
+      <button class="seg-btn" onclick="setMode('both',this)">둘 다</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-label">녹음 언어</div>
+    <div class="seg-control">
+      <button class="seg-btn" onclick="setRecLang('en-US',this)">🇺🇸 영어</button>
+      <button class="seg-btn active" onclick="setRecLang('mixed',this)">🌐 혼용</button>
+      <button class="seg-btn" onclick="setRecLang('ko-KR',this)">🇰🇷 한국어</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-label">녹음</div>
+    <div class="recorder-center">
+      <button class="record-btn idle" id="recordBtn" onclick="toggleRecord()">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="white"><circle cx="12" cy="12" r="7"/></svg>
+      </button>
+      <div class="timer" id="timer">00:00</div>
+      <div class="rec-status" id="recStatus">탭하여 녹음 시작</div>
+      <div class="live-transcript" id="liveTranscript"></div>
+      <div id="langToggleRow" class="hidden" style="margin-top:10px;text-align:center;">
+        <button onclick="toggleRecLang()" id="langToggleBtn"
+          style="padding:6px 16px;border-radius:20px;border:1px solid #ddd;background:#f5f5f7;font-size:13px;color:#555;cursor:pointer;">
+          🔄 언어 전환
+        </button>
+        <div id="currentLangLabel" style="font-size:11px;color:#aaa;margin-top:4px;"></div>
+      </div>
+    </div>
+    <button class="btn-primary hidden" id="stopBtn" onclick="stopRecording()">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="white"><rect x="3" y="3" width="10" height="10" rx="2"/></svg>
+      중지 및 분석
+    </button>
+  </div>
+
+  <div class="card hidden" id="resultCard">
+    <div class="card-label">녹음 자막 (전체)</div>
+    <div class="transcript-full" id="transcriptFull"></div>
+
+    <div class="divider">
+      <div class="divider-line"></div>
+      <div class="divider-text">AI 보고서</div>
+      <div class="divider-line"></div>
+    </div>
+
+    <div class="report-text" id="reportText"></div>
+    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:#888;margin-top:16px;margin-bottom:10px;">이메일 첨부 선택</div>
+    <div class="btn-row">
+      <button class="attach-btn" id="attachReport" onclick="toggleAttach('report')">
+        <span class="attach-check" id="checkReport">○</span> 보고서 첨부
+      </button>
+      <button class="attach-btn" id="attachTranscript" onclick="toggleAttach('transcript')">
+        <span class="attach-check" id="checkTranscript">○</span> 자막 첨부
+      </button>
+    </div>
+  </div>
+
+  <div class="card hidden" id="emailCard">
+    <div class="card-label">이메일로 공유</div>
+    <div id="audioBadge" class="audio-badge hidden">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+      <span id="audioBadgeText">음성 파일 OneDrive 업로드 중...</span>
+    </div>
+    <div class="field-label">
+      받는 사람
+      <span class="email-saved-badge hidden" id="emailSavedBadge">✓ 저장됨</span>
+    </div>
+    <input type="email" class="text-input" id="emailTo" placeholder="colleague@promega.com" oninput="onEmailInput()">
+    <div class="field-label">참조 (CC, 선택)</div>
+    <input type="email" class="text-input" id="emailCc" placeholder="team@promega.com">
+    <div class="field-label">제목</div>
+    <input type="text" class="text-input" id="emailSubject">
+    <button class="btn-send" id="sendBtn" onclick="sendEmail()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      Outlook으로 보내기
+    </button>
+    <p style="font-size:12px;color:#aaa;margin-top:8px;text-align:center;">첨부 선택 후 보내기를 눌러주세요</p>
+    <div class="error-msg hidden" id="emailError"></div>
+  </div>
+
+  <div class="card" id="chatCard">
+    <div class="card-label">AI에게 질문하기</div>
+    <div id="chatMessages" style="min-height:60px;max-height:280px;overflow-y:auto;margin-bottom:12px;"></div>
+    <div style="display:flex;gap:8px;align-items:flex-end;">
+      <textarea id="chatInput" class="text-input"
+        placeholder="보고서 내용에 대해 질문하거나 추가 분석을 요청하세요&#10;예) 액션 아이템을 영어로 번역해줘"
+        style="flex:1;resize:none;height:72px;font-size:14px;line-height:1.5;"
+        onkeydown="onChatKey(event)"></textarea>
+      <button onclick="sendChat()" id="chatSendBtn"
+        style="width:44px;height:44px;background:#E24B4A;border:none;border-radius:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      </button>
+    </div>
+    <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;" id="quickBtns">
+      <button class="quick-btn" onclick="quickAsk('액션 아이템을 표로 정리해줘')">📋 액션 아이템 표</button>
+      <button class="quick-btn" onclick="quickAsk('이 보고서를 영어로 번역해줘')">🌐 영어 번역</button>
+      <button class="quick-btn" onclick="quickAsk('후속 이메일 초안을 작성해줘')">✉️ 후속 이메일</button>
+      <button class="quick-btn" onclick="quickAsk('핵심 결정사항만 한 줄로 요약해줘')">⚡ 한 줄 요약</button>
+    </div>
+  </div>
+
+</div>
+
+<div class="overlay hidden" id="settingsOverlay">
+  <div class="modal">
+    <h2>⚙️ 설정</h2>
+    <p>Claude API 키를 입력하세요.<br>
+    발급: <a class="modal-link" href="https://console.anthropic.com" target="_blank">console.anthropic.com</a></p>
+    <div class="field-label">Claude API Key</div>
+    <input type="password" class="text-input" id="apiKeyInput" placeholder="sk-ant-...">
+    <button class="btn-primary" onclick="saveSettings()" style="margin-top:14px">저장</button>
+    <button class="btn-secondary" onclick="closeSettings()">취소</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let recognition = null;
+let mediaRecorder = null;
+let chatHistory = [];
+let recLang = 'mixed';
+let attachReport = false;
+let attachTranscript = false;
+let oneDriveUrl = null;
+let audioChunks = [];
+let audioBlob = null;
+let timerInterval = null;
+let seconds = 0;
+let currentMode = 'ko';
+let isRecording = false;
+let fullTranscript = '';
+let interimTranscript = '';
+let currentReport = '';
+
+window.addEventListener('load', () => {
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js');
+  if (!localStorage.getItem('claude_api_key')) openSettings();
+  loadSavedEmail();
+  attachReport = false; attachTranscript = false;
+  oneDriveUrl = null;
+  chatHistory = [];
+  document.getElementById('chatMessages').innerHTML = '';
+  ['attachReport','attachTranscript'].forEach(id => document.getElementById(id).classList.remove('selected'));
+  document.getElementById('checkReport').textContent = '○';
+  document.getElementById('checkTranscript').textContent = '○';
+  if (audioBlob) uploadAudioToOneDrive();
+});
+
+// ── 설정 ──
+function openSettings() {
+  document.getElementById('apiKeyInput').value = localStorage.getItem('claude_api_key') || '';
+  document.getElementById('settingsOverlay').classList.remove('hidden');
+}
+function closeSettings() { document.getElementById('settingsOverlay').classList.add('hidden'); }
+function saveSettings() {
+  const key = document.getElementById('apiKeyInput').value.trim();
+  if (!key.startsWith('sk-')) { showToast('올바른 API 키를 입력하세요'); return; }
+  localStorage.setItem('claude_api_key', key);
+  closeSettings();
+  showToast('저장되었습니다 ✓');
+}
+
+// ── 이메일 저장/불러오기 ──
+function loadSavedEmail() {
+  const saved = localStorage.getItem('saved_email');
+  if (saved) {
+    document.getElementById('emailTo').value = saved;
+    document.getElementById('emailSavedBadge').classList.remove('hidden');
+  }
+}
+function onEmailInput() {
+  const val = document.getElementById('emailTo').value.trim();
+  if (val) {
+    localStorage.setItem('saved_email', val);
+    document.getElementById('emailSavedBadge').classList.remove('hidden');
+  } else {
+    localStorage.removeItem('saved_email');
+    document.getElementById('emailSavedBadge').classList.add('hidden');
+  }
+}
+
+// ── 녹음 언어 ──
+function setRecLang(lang, btn) {
+  recLang = lang;
+  document.querySelectorAll('.seg-control')[1].querySelectorAll('.seg-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+function toggleRecLang() {
+  if (!recognition) return;
+  const langs = ['en-US', 'ko-KR'];
+  const current = recognition.lang;
+  const next = current === 'en-US' ? 'ko-KR' : 'en-US';
+  recognition.lang = next;
+  recognition.stop(); // onend 핸들러가 재시작
+  updateLangLabel(next);
+}
+function updateLangLabel(lang) {
+  const labels = { 'en-US': '🇺🇸 영어 인식 중', 'ko-KR': '🇰🇷 한국어 인식 중' };
+  const el = document.getElementById('currentLangLabel');
+  if (el) el.textContent = labels[lang] || '';
+}
+
+// ── 보고서 언어 ──
+function setMode(m, btn) {
+  currentMode = m;
+  document.querySelectorAll('.seg-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+// ── 타이머 ──
+function updateTimer() {
+  seconds++;
+  const m = String(Math.floor(seconds/60)).padStart(2,'0');
+  const s = String(seconds%60).padStart(2,'0');
+  document.getElementById('timer').textContent = m+':'+s;
+}
+
+// ── 녹음 시작 ──
+async function toggleRecord() {
+  if (isRecording) { stopRecording(); return; }
+  if (!localStorage.getItem('claude_api_key')) { openSettings(); return; }
+
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) { showToast('Safari를 사용해주세요.'); return; }
+
+  fullTranscript = '';
+  interimTranscript = '';
+  audioChunks = [];
+  audioBlob = null;
+
+  // 음성인식 시작
+  recognition = new SpeechRecognition();
+  const startLang = recLang === 'ko-KR' ? 'ko-KR'
+    : recLang === 'mixed' ? 'ko-KR'
+    : 'en-US';
+  recognition.lang = startLang;
+  recognition.continuous = true;
+  recognition.interimResults = true;
+
+  recognition.onresult = e => {
+    interimTranscript = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      if (e.results[i].isFinal) {
+        fullTranscript += e.results[i][0].transcript + ' ';
+      } else {
+        interimTranscript += e.results[i][0].transcript;
+      }
+    }
+    const box = document.getElementById('liveTranscript');
+    box.textContent = fullTranscript + interimTranscript;
+    box.scrollTop = box.scrollHeight;
+  };
+
+  recognition.onerror = e => {
+    if (e.error === 'not-allowed') showToast('마이크 권한이 필요합니다');
+    else if (e.error !== 'no-speech') showToast('음성인식 오류: ' + e.error);
+  };
+
+  recognition.onend = () => { if (isRecording) recognition.start(); };
+  recognition.start();
+
+  // 오디오 녹음 병렬 시작
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const mimeType = MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4'
+      : MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/ogg';
+    mediaRecorder = new MediaRecorder(stream, { mimeType });
+    mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
+    mediaRecorder.onstop = () => {
+      audioBlob = new Blob(audioChunks, { type: mimeType });
+      stream.getTracks().forEach(t => t.stop());
+    };
+    mediaRecorder.start(1000);
+  } catch(e) {
+    // 오디오 녹음 실패해도 음성인식은 계속
+  }
+
+  isRecording = true;
+  seconds = 0;
+  timerInterval = setInterval(updateTimer, 1000);
+
+  document.getElementById('recordBtn').className = 'record-btn recording';
+  const statusMsg = recLang === 'ko-KR' ? '한국어로 말씀하세요...'
+    : recLang === 'mixed' ? '영어/한국어 자유롭게 말씀하세요...'
+    : '영어로 말씀하세요...';
+  document.getElementById('recStatus').textContent = statusMsg;
+  document.getElementById('liveTranscript').style.display = 'block';
+  document.getElementById('stopBtn').classList.remove('hidden');
+  if (recLang === 'mixed') {
+    document.getElementById('langToggleRow').classList.remove('hidden');
+    updateLangLabel('ko-KR');
+  }
+  document.getElementById('resultCard').classList.add('hidden');
+  document.getElementById('emailCard').classList.add('hidden');
+}
+
+// ── 녹음 중지 ──
+function stopRecording() {
+  if (!recognition) return;
+  isRecording = false;
+  clearInterval(timerInterval);
+
+  // 음성인식 종료
+  recognition.onresult = null;
+  recognition.onerror = null;
+  recognition.onend = null;
+  try { recognition.abort(); } catch(e) {}
+  recognition = null;
+
+  // 오디오 녹음 종료
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    mediaRecorder.stop();
+  }
+
+  document.getElementById('recordBtn').className = 'record-btn processing';
+  document.getElementById('recStatus').textContent = 'Claude 분석 중...';
+  document.getElementById('stopBtn').classList.add('hidden');
+  document.getElementById('langToggleRow').classList.add('hidden');
+
+  const transcript = (fullTranscript + interimTranscript).trim();
+  if (!transcript) {
+    showToast('음성이 인식되지 않았습니다. 다시 시도해주세요.');
+    resetRecorder();
+    return;
+  }
+  // 음성 파일 즉시 자동 저장
+  setTimeout(() => {
+    if (audioBlob) {
+      autoSaveAudio();
+    }
+    analyzeWithClaude(transcript);
+  }, 400);
+}
+
+// ── Claude 분석 ──
+async function analyzeWithClaude(transcript) {
+  const key = localStorage.getItem('claude_api_key');
+  const today = new Date().toLocaleDateString('ko-KR', {year:'numeric', month:'long', day:'numeric'});
+  const langNote = recLang === 'mixed' ? '전사본은 한국어와 영어가 혼용되어 있을 수 있습니다. 두 언어 모두 정확히 처리해주세요.' : '';
+  const modePrompt = currentMode === 'ko' ? '결과물은 반드시 한국어로 작성하세요.'
+    : currentMode === 'en' ? 'Provide output in English only.'
+    : '영어 원문과 한국어 번역 둘 다 포함하세요.';
+
+  const prompt = `다음은 영어 미팅의 음성인식 전사본입니다. 분석해서 구조화된 보고서를 작성해주세요.
+${modePrompt}
+
+전사본 ${langNote ? "(한영 혼용)" : ""}:
+${transcript}
+${langNote}
+
+---
+보고서 형식 (마크다운 없이 순수 텍스트):
+
+[회의 개요]
+일시: ${today}
+참석자: (언급된 이름 또는 확인 불가)
+
+[핵심 요약]
+3-5문장 요약
+
+[주요 논의 사항]
+1. ...
+2. ...
+
+[결정 사항]
+- ...
+
+[액션 아이템]
+- [담당자] 내용
+
+[기타]
+없으면 없음`;
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': key,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1500,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+
+    const data = await res.json();
+    if (data.error) throw new Error(data.error.message);
+    const text = data.content?.find(b => b.type === 'text')?.text || '';
+    currentReport = text;
+    showResult(transcript, text, today);
+  } catch(e) {
+    showToast('분석 오류: ' + e.message);
+    resetRecorder();
+  }
+}
+
+// ── 결과 표시 ──
+function showResult(transcript, report, today) {
+  resetRecorder();
+  document.getElementById('liveTranscript').style.display = 'none';
+
+  // 전체 자막
+  document.getElementById('transcriptFull').textContent = transcript;
+
+  // 보고서
+  document.getElementById('reportText').textContent = report;
+  document.getElementById('resultCard').classList.remove('hidden');
+
+  // 이메일 섹션
+  document.getElementById('emailCard').classList.remove('hidden');
+  document.getElementById('emailSubject').value = `[미팅 보고서] ${today} 회의 요약`;
+
+  // 음성 파일 첨부 배지
+  if (audioBlob) {
+    document.getElementById('audioBadge').classList.remove('hidden');
+  }
+
+  loadSavedEmail();
+  attachReport = false; attachTranscript = false;
+  oneDriveUrl = null;
+  chatHistory = [];
+  document.getElementById('chatMessages').innerHTML = '';
+  ['attachReport','attachTranscript'].forEach(id => document.getElementById(id).classList.remove('selected'));
+  document.getElementById('checkReport').textContent = '○';
+  document.getElementById('checkTranscript').textContent = '○';
+  if (audioBlob) uploadAudioToOneDrive();
+
+  setTimeout(() => {
+    document.getElementById('resultCard').scrollIntoView({ behavior: 'smooth' });
+  }, 100);
+}
+
+// ── 첨부 토글 ──
+function toggleAttach(type) {
+  if (type === 'report') {
+    attachReport = !attachReport;
+    const btn = document.getElementById('attachReport');
+    const chk = document.getElementById('checkReport');
+    btn.classList.toggle('selected', attachReport);
+    chk.textContent = attachReport ? '●' : '○';
+  } else {
+    attachTranscript = !attachTranscript;
+    const btn = document.getElementById('attachTranscript');
+    const chk = document.getElementById('checkTranscript');
+    btn.classList.toggle('selected', attachTranscript);
+    chk.textContent = attachTranscript ? '●' : '○';
+  }
+}
+
+// ── 이메일 전송 ──
+async function sendEmail() {
+  const to = document.getElementById('emailTo').value.trim();
+  const cc = document.getElementById('emailCc').value.trim();
+  const subject = document.getElementById('emailSubject').value.trim();
+  const errEl = document.getElementById('emailError');
+
+  if (!to) {
+    errEl.textContent = '받는 사람을 입력해주세요';
+    errEl.classList.remove('hidden');
+    return;
+  }
+  errEl.classList.add('hidden');
+
+  const transcript = document.getElementById('transcriptFull').textContent;
+  const today = new Date().toLocaleDateString('ko-KR');
+  const finalSubject = subject || '[미팅 보고서] ' + today + ' 회의 요약';
+  const divider = '\u2500'.repeat(40);
+
+  // 첨부 파일 생성
+  const files = [];
+  if (attachReport && currentReport) {
+    const blob = new Blob([currentReport], { type: 'text/plain' });
+    files.push(new File([blob], '미팅보고서_' + today + '.txt', { type: 'text/plain' }));
+  }
+  if (attachTranscript && transcript) {
+    const blob = new Blob([transcript], { type: 'text/plain' });
+    files.push(new File([blob], '미팅자막_' + today + '.txt', { type: 'text/plain' }));
+  }
+
+  // 이메일 본문 구성
+  // 보고서와 자막은 항상 본문에 포함 (첨부 선택 여부와 무관)
+  let body = '안녕하세요,\n\n미팅 보고서를 공유드립니다.\n\n';
+  if (currentReport) body += divider + '\n\n[AI 미팅 보고서]\n\n' + currentReport + '\n\n';
+  if (transcript) body += divider + '\n\n[전체 음성 인식 자막]\n\n' + transcript + '\n\n';
+  body += divider + '\n본 보고서는 AI가 자동 생성한 내용입니다.\n감사합니다.';
+
+  // 음성 파일 다운로드
+  if (audioBlob) offerAudioDownload();
+
+  // Web Share API로 파일 공유 시도 (iOS에서 Outlook으로 직접 공유 가능)
+  if (files.length > 0 && navigator.canShare && navigator.canShare({ files })) {
+    try {
+      await navigator.share({ files: files, title: finalSubject, text: body });
+      return;
+    } catch(e) {
+      if (e.name !== 'AbortError') {
+        files.forEach(function(f) {
+          var url = URL.createObjectURL(f);
+          var a = document.createElement('a');
+          a.href = url; a.download = f.name; a.click();
+          setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
+        });
+        showToast('파일 다운로드됨. 이메일에 직접 첨부해주세요.');
+      }
+    }
+  } else if (files.length > 0) {
+    files.forEach(function(f) {
+      var url = URL.createObjectURL(f);
+      var a = document.createElement('a');
+      a.href = url; a.download = f.name; a.click();
+      setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
+    });
+    showToast('파일 다운로드됨. 이메일에 직접 첨부해주세요.');
+  }
+
+  // mailto로 Outlook 열기
+  var mailtoUrl = 'mailto:' + encodeURIComponent(to)
+    + (cc ? '?cc=' + encodeURIComponent(cc) + '&' : '?')
+    + 'subject=' + encodeURIComponent(finalSubject)
+    + '&body=' + encodeURIComponent(body);
+  window.location.href = mailtoUrl;
+}
+
+// ── OneDrive 업로드 ──
+async function uploadAudioToOneDrive() {
+  if (!audioBlob) return;
+  const key = localStorage.getItem('claude_api_key');
+  if (!key) return;
+
+  const badge = document.getElementById('audioBadge');
+  const badgeText = document.getElementById('audioBadgeText');
+  badge.classList.remove('hidden');
+  badgeText.textContent = '음성 파일 OneDrive 업로드 중...';
+  badge.style.background = '#fff3e0';
+  badge.style.color = '#e65100';
+
+  if (audioBlob.size > 5 * 1024 * 1024) {
+    badgeText.textContent = '음성 파일이 큽니다 (이메일 전송 시 자동 다운로드)';
+    offerAudioDownload();
+    return;
+  }
+
+  try {
+    const base64 = await blobToBase64(audioBlob);
+    const ext = audioBlob.type.includes('mp4') ? 'm4a' : audioBlob.type.includes('webm') ? 'webm' : 'ogg';
+    const today = new Date().toLocaleDateString('ko-KR').replace(/\. /g, '-').replace('.', '');
+    const fileName = '미팅녹음_' + today + '.' + ext;
+    const prompt = 'OneDrive의 미팅녹음 폴더에 파일을 업로드하고 공유 링크를 반환해주세요. 파일명: ' + fileName + ' / 파일형식: ' + audioBlob.type + ' / base64: ' + base64 + ' / 업로드 성공 시 공유 링크만 반환. 실패 시 FAILED 반환.';
+
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': key,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 500,
+        messages: [{ role: 'user', content: prompt }],
+        mcp_servers: [{ type: 'url', url: 'https://microsoft365.mcp.claude.com/mcp', name: 'microsoft365' }]
+      })
+    });
+
+    const data = await res.json();
+    if (data.error) throw new Error(data.error.message);
+    const text = data.content && data.content.find(function(b) { return b.type === 'text'; });
+    const result = text ? text.text : '';
+
+    if (result.includes('FAILED') || !result.includes('http')) throw new Error('업로드 실패');
+
+    const urlMatch = result.match(/https?:\/\/[^\s\n"')]+/);
+    if (urlMatch) {
+      oneDriveUrl = urlMatch[0];
+      badgeText.textContent = '음성 파일 OneDrive 업로드 완료 ✓';
+      badge.style.background = '#e8f5e9';
+      badge.style.color = '#2e7d32';
+    } else {
+      throw new Error('링크 없음');
+    }
+  } catch(e) {
+    oneDriveUrl = null;
+    badgeText.textContent = '업로드 실패 → 이메일 전송 시 자동 다운로드';
+    badge.style.background = '#fff3e0';
+    badge.style.color = '#e65100';
+  }
+}
+
+// ── 음성 파일 자동 저장 ──
+function autoSaveAudio() {
+  if (!audioBlob) return;
+  try {
+    const ext = audioBlob.type.includes('mp4') ? 'm4a'
+      : audioBlob.type.includes('webm') ? 'webm' : 'ogg';
+    const now = new Date();
+    const dateStr = now.getFullYear() + '-'
+      + String(now.getMonth()+1).padStart(2,'0') + '-'
+      + String(now.getDate()).padStart(2,'0') + '_'
+      + String(now.getHours()).padStart(2,'0')
+      + String(now.getMinutes()).padStart(2,'0');
+    const fileName = '미팅녹음_' + dateStr + '.' + ext;
+    const url = URL.createObjectURL(audioBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    showToast('음성 파일 저장됨: ' + fileName);
+  } catch(e) {
+    console.log('자동 저장 오류:', e.message);
+  }
+}
+
+// ── 음성 파일 다운로드 ──
+function offerAudioDownload() {
+  if (!audioBlob) return;
+  const url = URL.createObjectURL(audioBlob);
+  const a = document.createElement('a');
+  const ext = audioBlob.type.includes('mp4') ? 'm4a' : audioBlob.type.includes('webm') ? 'webm' : 'ogg';
+  a.href = url;
+  a.download = `meeting_${new Date().toISOString().slice(0,10)}.${ext}`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+
+
+// ── 유틸 ──
+function blobToBase64(blob) {
+  return new Promise((res,rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result.split(',')[1]);
+    r.onerror = rej;
+    r.readAsDataURL(blob);
+  });
+}
+function copyReport() {
+  navigator.clipboard.writeText(currentReport).then(() => showToast('보고서 복사됨 ✓'));
+}
+function copyTranscript() {
+  const t = document.getElementById('transcriptFull').textContent;
+  navigator.clipboard.writeText(t).then(() => showToast('자막 복사됨 ✓'));
+}
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2800);
+}
+function resetRecorder() {
+  document.getElementById('recordBtn').className = 'record-btn idle';
+  document.getElementById('recStatus').textContent = '탭하여 녹음 시작';
+  document.getElementById('timer').textContent = '00:00';
+  seconds = 0; isRecording = false;
+}
+</script>
+</body>
+</html>
