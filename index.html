@@ -87,6 +87,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Helvetica Neue',sans-serif;ba
 .quick-btn{padding:6px 12px;background:#f0f0f0;border:none;border-radius:20px;font-size:12px;color:#555;cursor:pointer;white-space:nowrap}
 .quick-btn:active{background:#e0e0e0}
 
+.loading-spinner{width:36px;height:36px;border:3px solid #f0f0f0;border-top-color:#E24B4A;border-radius:50%;animation:spin .9s linear infinite;margin:0 auto 14px}
+@keyframes spin{to{transform:rotate(360deg)}}
 .toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.78);color:#fff;padding:10px 20px;border-radius:20px;font-size:14px;white-space:nowrap;opacity:0;transition:opacity .2s;pointer-events:none;z-index:100}
 .toast.show{opacity:1}
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:flex-end;z-index:50}
@@ -146,13 +148,30 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Helvetica Neue',sans-serif;ba
       </div>
       <button class="btn-primary hidden" id="stopBtn" onclick="stopRecording()">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="white"><rect x="3" y="3" width="10" height="10" rx="2"/></svg>
-        중지 및 분석
+        녹음 중지
       </button>
     </div>
   </div>
 
   <!-- 오른쪽: 결과 + 이메일 + 채팅 -->
   <div>
+    <div class="card hidden" id="summaryLoadingCard">
+      <div style="text-align:center;padding:16px 0">
+        <div class="loading-spinner"></div>
+        <div style="font-size:15px;font-weight:600;color:#1d1d1f">AI 요약 생성 중...</div>
+        <div style="font-size:13px;color:#888;margin-top:6px" id="summaryLoadingStep">전사본 분석 중</div>
+      </div>
+    </div>
+
+    <div class="card hidden" id="summaryErrorCard">
+      <div style="text-align:center;padding:16px 0">
+        <div style="font-size:28px;margin-bottom:10px">⚠️</div>
+        <div style="font-size:15px;font-weight:600;color:#1d1d1f;margin-bottom:6px">요약 생성 실패</div>
+        <div style="font-size:13px;color:#888;margin-bottom:16px" id="summaryErrorMsg">다시 시도해주세요.</div>
+        <button class="btn-primary" onclick="retryAnalysis()" style="max-width:200px;margin:0 auto">다시 시도</button>
+      </div>
+    </div>
+
     <div class="card hidden" id="resultCard">
       <div class="card-label">녹음 자막 (전체)</div>
       <div class="transcript-box" id="transcriptFull"></div>
@@ -227,6 +246,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Helvetica Neue',sans-serif;ba
 var recognition = null;
 var mediaRecorder = null;
 var audioChunks = [];
+var lastTranscript = '';
 var audioBlob = null;
 var timerInterval = null;
 var seconds = 0;
@@ -393,7 +413,14 @@ function stopRecording() {
     resetRecorder();
     return;
   }
+  lastTranscript = transcript;
+  document.getElementById('summaryLoadingCard').classList.remove('hidden');
+  document.getElementById('summaryErrorCard').classList.add('hidden');
+  document.getElementById('resultCard').classList.add('hidden');
+  document.getElementById('emailCard').classList.add('hidden');
+  document.getElementById('summaryLoadingStep').textContent = '전사본 분석 중';
   setTimeout(function() {
+    document.getElementById('summaryLoadingCard').scrollIntoView({ behavior: 'smooth' });
     autoSaveAudio();
     analyzeWithClaude(transcript);
   }, 400);
@@ -440,6 +467,14 @@ async function analyzeWithClaude(transcript) {
     + '[액션 아이템]\n- [담당자] 내용\n\n'
     + '[기타]\n없으면 없음';
 
+  if (!key) {
+    document.getElementById('summaryLoadingCard').classList.add('hidden');
+    document.getElementById('summaryErrorCard').classList.remove('hidden');
+    document.getElementById('summaryErrorMsg').textContent = 'API 키가 설정되지 않았습니다. 설정에서 API 키를 입력해주세요.';
+    resetRecorder();
+    return;
+  }
+  document.getElementById('summaryLoadingStep').textContent = 'Claude AI에게 요청 중';
   try {
     var res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -455,13 +490,17 @@ async function analyzeWithClaude(transcript) {
         messages: [{ role: 'user', content: prompt }]
       })
     });
+    document.getElementById('summaryLoadingStep').textContent = '보고서 작성 중';
     var data = await res.json();
     if (data.error) throw new Error(data.error.message);
     var tb = data.content && data.content.find(function(b){ return b.type === 'text'; });
     currentReport = tb ? tb.text : '';
+    document.getElementById('summaryLoadingCard').classList.add('hidden');
     showResult(transcript, currentReport, today);
   } catch(e) {
-    showToast('분석 오류: ' + e.message);
+    document.getElementById('summaryLoadingCard').classList.add('hidden');
+    document.getElementById('summaryErrorCard').classList.remove('hidden');
+    document.getElementById('summaryErrorMsg').textContent = e.message || '네트워크 오류가 발생했습니다.';
     resetRecorder();
   }
 }
@@ -686,7 +725,18 @@ function resetRecorder() {
   document.getElementById('recordBtn').className = 'record-btn idle';
   document.getElementById('recStatus').textContent = '버튼을 눌러 녹음 시작';
   document.getElementById('timer').textContent = '00:00';
+  document.getElementById('summaryLoadingCard').classList.add('hidden');
   seconds = 0; isRecording = false;
+}
+function retryAnalysis() {
+  if (!lastTranscript) { showToast('재시도할 전사본이 없습니다.'); return; }
+  document.getElementById('summaryErrorCard').classList.add('hidden');
+  document.getElementById('summaryLoadingCard').classList.remove('hidden');
+  document.getElementById('summaryLoadingStep').textContent = '전사본 분석 중';
+  setTimeout(function() {
+    document.getElementById('summaryLoadingCard').scrollIntoView({ behavior: 'smooth' });
+    analyzeWithClaude(lastTranscript);
+  }, 200);
 }
 </script>
 </body>
